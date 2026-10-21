@@ -45,11 +45,11 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
         CGContextFillRect(ctx, CGRectMake(size * 0.55, size * 0.24, size * 0.12, size * 0.52));
     } else if (type == OVPlayerGlyphNext || type == OVPlayerGlyphPrevious) {
         BOOL next = (type == OVPlayerGlyphNext);
-        CGFloat triLeft = next ? size * 0.26 : size * 0.38;
-        CGFloat triRight = next ? size * 0.66 : size * 0.78;
-        CGContextMoveToPoint(ctx, triLeft, size * 0.24);
-        CGContextAddLineToPoint(ctx, triLeft, size * 0.76);
-        CGContextAddLineToPoint(ctx, triRight, size * 0.50);
+        CGFloat triBaseX = next ? size * 0.26 : size * 0.62;
+        CGFloat triApexX = next ? size * 0.66 : size * 0.34;
+        CGContextMoveToPoint(ctx, triBaseX, size * 0.24);
+        CGContextAddLineToPoint(ctx, triBaseX, size * 0.76);
+        CGContextAddLineToPoint(ctx, triApexX, size * 0.50);
         CGContextClosePath(ctx);
         CGContextFillPath(ctx);
         CGFloat barX = next ? size * 0.70 : size * 0.22;
@@ -91,7 +91,9 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 
 // Aleatorio
 @property (nonatomic, assign) BOOL shuffleMode;
-@property (nonatomic, strong) NSArray *originalItems;
+@property (nonatomic, strong) NSMutableSet *shufflePlayed;
+@property (nonatomic, strong) NSMutableArray *shuffleHistory;
+@property (nonatomic, assign) VLCRepeatMode repeatModePreference;
 @property (nonatomic, assign) double pendingSeekTime;
 @property (nonatomic, assign) BOOL pendingPauseAfterRebuild;
 
@@ -590,10 +592,133 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 - (void)buildPlayback
 {
     self.listPlayer = [[VLCMediaListPlayer alloc] initWithDrawable:self.videoView];
-    self.listPlayer.repeatMode = VLCDoNotRepeat;
+    self.repeatModePreference = VLCDoNotRepeat;
+    self.listPlayer.repeatMode = self.repeatModePreference;
     self.listPlayer.delegate = self;
     self.listPlayer.mediaPlayer.delegate = self;
     self.listPlayer.mediaList = [self mediaListForItems:self.items];
+}
+
+- (void)applyRepeatMode
+{
+    if (!self.listPlayer) {
+        return;
+    }
+    // Con aleatorio la lista de VLC contiene solo la canción actual. Si
+    // pusiéramos "repetir todo" VLC repetiría esa misma canción, así que el
+    // final de la cola lo gestionamos nosotros con la bolsa de aleatorio.
+    if (self.shuffleMode && self.repeatModePreference == VLCRepeatAllItems) {
+        self.listPlayer.repeatMode = VLCDoNotRepeat;
+    } else {
+        self.listPlayer.repeatMode = self.repeatModePreference;
+    }
+}
+
+- (void)loadShuffleItemAtIndex:(NSInteger)index
+                      seekTime:(double)seekTime
+                    wasPlaying:(BOOL)wasPlaying
+{
+    if (index < 0 || index >= (NSInteger)self.items.count) {
+        return;
+    }
+
+    if (!self.shufflePlayed) {
+        self.shufflePlayed = [NSMutableSet set];
+    }
+    [self.shufflePlayed addObject:@(index)];
+
+    [self.listPlayer stop];
+    self.currentIndex = index;
+    OVMediaItem *item = self.items[index];
+    self.listPlayer.mediaList = [self mediaListForItems:@[item]];
+    [self updateForCurrentItem];
+    self.resumeApplied = YES;
+    self.pendingSeekTime = MAX(0.0, seekTime);
+    self.pendingPauseAfterRebuild = !wasPlaying;
+    [self applyRepeatMode];
+    [self.listPlayer playItemAtNumber:@(0)];
+    [self showControls];
+}
+
+- (NSInteger)nextShuffleIndexAllowingReset:(BOOL)allowReset
+{
+    NSInteger count = (NSInteger)self.items.count;
+    if (count < 2) {
+        return NSNotFound;
+    }
+
+    if (!self.shufflePlayed) {
+        self.shufflePlayed = [NSMutableSet set];
+    }
+
+    NSMutableArray *candidates = [NSMutableArray array];
+    for (NSInteger i = 0; i < count; i++) {
+        if (i == self.currentIndex) {
+            continue;
+        }
+        if (![self.shufflePlayed containsObject:@(i)]) {
+            [candidates addObject:@(i)];
+        }
+    }
+
+    if (candidates.count == 0 && allowReset) {
+        [self.shufflePlayed removeAllObjects];
+        [self.shufflePlayed addObject:@(self.currentIndex)];
+        for (NSInteger i = 0; i < count; i++) {
+            if (i != self.currentIndex) {
+                [candidates addObject:@(i)];
+            }
+        }
+    }
+
+    if (candidates.count == 0) {
+        return NSNotFound;
+    }
+
+    NSInteger selected = [candidates[arc4random_uniform((uint32_t)candidates.count)] integerValue];
+    return selected;
+}
+
+- (void)playShuffleNextAllowingReset:(BOOL)allowReset
+{
+    NSInteger next = [self nextShuffleIndexAllowingReset:allowReset];
+    if (next == NSNotFound) {
+        [self showPlaylistFinished];
+        return;
+    }
+
+    [self saveCurrentPosition];
+    if (!self.shuffleHistory) {
+        self.shuffleHistory = [NSMutableArray array];
+    }
+    [self.shuffleHistory addObject:@(self.currentIndex)];
+    if (self.shuffleHistory.count > 200) {
+        [self.shuffleHistory removeObjectAtIndex:0];
+    }
+    [self loadShuffleItemAtIndex:next seekTime:0.0 wasPlaying:YES];
+}
+
+- (void)playShufflePrevious
+{
+    if (!self.shuffleHistory || self.shuffleHistory.count == 0) {
+        [self seekToTime:0.0];
+        return;
+    }
+
+    [self saveCurrentPosition];
+    NSInteger previous = [[self.shuffleHistory lastObject] integerValue];
+    [self.shuffleHistory removeLastObject];
+    [self loadShuffleItemAtIndex:previous seekTime:0.0 wasPlaying:YES];
+}
+
+- (void)showPlaylistFinished
+{
+    [self saveCurrentPosition];
+    [self showControls];
+    [self updatePlayButton];
+    self.statusLabel.text = @"Fin de la lista de reproducción";
+    self.statusLabel.hidden = NO;
+    [self.spinner stopAnimating];
 }
 
 - (void)rebuildPlaybackWithItems:(NSArray *)items
@@ -619,6 +744,7 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
     self.resumeApplied = YES;
     self.pendingSeekTime = time;
     self.pendingPauseAfterRebuild = !wasPlaying;
+    [self applyRepeatMode];
     [self.listPlayer playItemAtNumber:@(self.currentIndex)];
     [self showControls];
 }
@@ -703,10 +829,19 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
     [self updateShuffleButton];
 
     self.playlistButton.enabled = self.items.count > 1;
-    self.previousButton.enabled = self.currentIndex > 0;
-    self.nextButton.enabled = self.currentIndex + 1 < (NSInteger)self.items.count;
+    if (self.shuffleMode) {
+        self.previousButton.enabled = (self.shuffleHistory.count > 0);
+        BOOL unplayed = self.shufflePlayed.count < self.items.count;
+        self.nextButton.enabled = unplayed ||
+            (self.repeatModePreference == VLCRepeatAllItems);
+    } else {
+        BOOL repeatAll = (self.repeatModePreference == VLCRepeatAllItems);
+        self.previousButton.enabled = (self.currentIndex > 0) || repeatAll;
+        self.nextButton.enabled = (self.currentIndex + 1 < (NSInteger)self.items.count) || repeatAll;
+    }
 
-    [self updateRepeatButton];    [self updateSpeedButton];
+    [self updateRepeatButton];
+    [self updateSpeedButton];
     [self updateNowPlayingInfo];
 }
 
@@ -733,8 +868,14 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
         if (player.state == VLCMediaPlayerStateStopped ||
             player.state == VLCMediaPlayerStateEnded ||
             player.state == VLCMediaPlayerStateError) {
-            [self prepareForIndex:self.currentIndex];
-            [self.listPlayer playItemAtNumber:@(self.currentIndex)];
+            if (self.shuffleMode) {
+                [self loadShuffleItemAtIndex:self.currentIndex
+                                    seekTime:0.0
+                                  wasPlaying:YES];
+            } else {
+                [self prepareForIndex:self.currentIndex];
+                [self.listPlayer playItemAtNumber:@(self.currentIndex)];
+            }
         } else {
             [self.listPlayer play];
         }
@@ -745,9 +886,19 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 
 - (void)playPrevious
 {
+    if (self.shuffleMode) {
+        [self playShufflePrevious];
+        return;
+    }
+
     if (self.currentIndex > 0) {
         [self saveCurrentPosition];
         [self prepareForIndex:self.currentIndex - 1];
+        [self.listPlayer playItemAtNumber:@(self.currentIndex)];
+    } else if (self.repeatModePreference == VLCRepeatAllItems &&
+               self.items.count > 1) {
+        [self saveCurrentPosition];
+        [self prepareForIndex:(NSInteger)self.items.count - 1];
         [self.listPlayer playItemAtNumber:@(self.currentIndex)];
     } else {
         [self seekToTime:0.0];
@@ -756,10 +907,21 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 
 - (void)playNext
 {
+    if (self.shuffleMode) {
+        [self playShuffleNextAllowingReset:
+            (self.repeatModePreference == VLCRepeatAllItems)];
+        return;
+    }
+
     if (self.currentIndex + 1 < (NSInteger)self.items.count) {
         [self saveCurrentPosition];
         [self prepareForIndex:self.currentIndex + 1];
         [self.listPlayer playItemAtNumber:@(self.currentIndex)];
+    } else if (self.repeatModePreference == VLCRepeatAllItems &&
+               self.items.count > 0) {
+        [self saveCurrentPosition];
+        [self prepareForIndex:0];
+        [self.listPlayer playItemAtNumber:@(0)];
     } else {
         [OVTheme showToast:@"No hay más elementos en la lista" inView:self.view];
     }
@@ -767,42 +929,27 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 
 - (void)toggleShuffle
 {
-    OVMediaItem *current = [self currentItem];
-    if (!current || self.items.count < 2) {
+    if (self.items.count < 2) {
         [OVTheme showToast:@"No hay suficientes elementos para aleatorio" inView:self.view];
         return;
     }
 
     double time = MAX(0.0, self.listPlayer.mediaPlayer.time.intValue / 1000.0);
+    BOOL wasPlaying = self.listPlayer.mediaPlayer.isPlaying;
 
     if (!self.shuffleMode) {
-        self.originalItems = [self.items copy];
-
-        NSMutableArray *others = [NSMutableArray array];
-        for (OVMediaItem *item in self.items) {
-            if (item != current) {
-                [others addObject:item];
-            }
-        }
-        for (NSInteger i = (NSInteger)others.count - 1; i > 0; i--) {
-            NSInteger j = arc4random_uniform((uint32_t)(i + 1));
-            [others exchangeObjectAtIndex:i withObjectAtIndex:j];
-        }
-
-        NSMutableArray *shuffled = [NSMutableArray arrayWithObject:current];
-        [shuffled addObjectsFromArray:others];
         self.shuffleMode = YES;
-        [self rebuildPlaybackWithItems:shuffled currentIndex:0 seekTime:time];
+        self.shufflePlayed = [NSMutableSet setWithObject:@(self.currentIndex)];
+        self.shuffleHistory = [NSMutableArray array];
+        [self loadShuffleItemAtIndex:self.currentIndex seekTime:time wasPlaying:wasPlaying];
         [OVTheme showToast:@"Aleatorio activado" inView:self.view];
     } else {
-        NSArray *original = self.originalItems ?: self.items;
-        NSInteger index = [original indexOfObject:current];
-        if (index == NSNotFound) {
-            index = 0;
-        }
         self.shuffleMode = NO;
-        [self rebuildPlaybackWithItems:original currentIndex:index seekTime:time];
-        self.originalItems = nil;
+        self.shufflePlayed = nil;
+        self.shuffleHistory = nil;
+        [self rebuildPlaybackWithItems:self.items
+                          currentIndex:self.currentIndex
+                             seekTime:time];
         [OVTheme showToast:@"Aleatorio desactivado" inView:self.view];
     }
 
@@ -1288,9 +1435,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 - (void)updateRepeatButton
 {
     NSString *title = @"Repetir";
-    if (self.listPlayer.repeatMode == VLCRepeatAllItems) {
+    if (self.repeatModePreference == VLCRepeatAllItems) {
         title = @"Repetir todo";
-    } else if (self.listPlayer.repeatMode == VLCRepeatCurrentItem) {
+    } else if (self.repeatModePreference == VLCRepeatCurrentItem) {
         title = @"Repetir uno";
     }
     [self.repeatButton setTitle:title forState:UIControlStateNormal];
@@ -1372,6 +1519,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
 - (void)mediaListPlayer:(VLCMediaListPlayer *)player nextMedia:(VLCMedia *)media
 {
+    // En modo aleatorio la lista de VLC contiene una sola canción y el
+    // siguiente tema lo elegimos nosotros; el índice de esa lista no
+    // corresponde con self.items.
+    if (self.shuffleMode) {
+        return;
+    }
+
     NSInteger index = [player.mediaList indexOfMedia:media];
     dispatch_async(dispatch_get_main_queue(), ^{
         if (index != NSNotFound) {
@@ -1385,12 +1539,19 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 - (void)mediaListPlayerFinishedPlayback:(VLCMediaListPlayer *)player
 {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self saveCurrentPosition];
-        [self showControls];
-        [self updatePlayButton];
-        self.statusLabel.text = @"Fin de la lista de reproducción";
-        self.statusLabel.hidden = NO;
-        [self.spinner stopAnimating];
+        if (self.shuffleMode) {
+            if (self.repeatModePreference == VLCRepeatCurrentItem) {
+                [self loadShuffleItemAtIndex:self.currentIndex
+                                    seekTime:0.0
+                                  wasPlaying:YES];
+            } else {
+                [self playShuffleNextAllowingReset:
+                    (self.repeatModePreference == VLCRepeatAllItems)];
+            }
+            return;
+        }
+
+        [self showPlaylistFinished];
     });
 }
 
@@ -1776,7 +1937,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                                                       inView:self.view
                                                      popover:self.repeatButton];
     NSArray *titles = @[@"No repetir", @"Repetir uno", @"Repetir todo"];
-    VLCRepeatMode current = self.listPlayer.repeatMode;
+    VLCRepeatMode current = self.repeatModePreference;
     __weak OVPlayerViewController *weakSelf = self;
     for (NSInteger i = 0; i < titles.count; i++) {
         NSString *title = titles[i];
@@ -1786,8 +1947,10 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         [sheet addAction:[UIAlertAction actionWithTitle:title
                                                  style:UIAlertActionStyleDefault
                                                handler:^(UIAlertAction *action) {
-            weakSelf.listPlayer.repeatMode = (VLCRepeatMode)i;
+            weakSelf.repeatModePreference = (VLCRepeatMode)i;
+            [weakSelf applyRepeatMode];
             [weakSelf updateRepeatButton];
+            [weakSelf updateForCurrentItem];
         }]];
     }
     [sheet addAction:[UIAlertAction actionWithTitle:@"Cancelar"
@@ -1807,8 +1970,16 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         if (!strongSelf) {
             return;
         }
-        [strongSelf prepareForIndex:index];
-        [strongSelf.listPlayer playItemAtNumber:@(index)];
+        if (strongSelf.shuffleMode) {
+            if (!strongSelf.shuffleHistory) {
+                strongSelf.shuffleHistory = [NSMutableArray array];
+            }
+            [strongSelf.shuffleHistory addObject:@(strongSelf.currentIndex)];
+            [strongSelf loadShuffleItemAtIndex:index seekTime:0.0 wasPlaying:YES];
+        } else {
+            [strongSelf prepareForIndex:index];
+            [strongSelf.listPlayer playItemAtNumber:@(index)];
+        }
         [strongSelf showControls];
     };
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:playlist];
@@ -1963,10 +2134,6 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if ([center respondsToSelector:@selector(changePlaybackPositionCommand)]) {
         center.changePlaybackPositionCommand.enabled = YES;
     }
-    center.skipForwardCommand.enabled = YES;
-    center.skipForwardCommand.preferredIntervals = @[@15];
-    center.skipBackwardCommand.enabled = YES;
-    center.skipBackwardCommand.preferredIntervals = @[@10];
 
     __weak OVPlayerViewController *weakSelf = self;
 
@@ -2000,7 +2167,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     id nextToken = [center.nextTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
         OVPlayerViewController *strongSelf = weakSelf;
         if (!strongSelf) return MPRemoteCommandHandlerStatusCommandFailed;
-        if (strongSelf.currentIndex + 1 >= (NSInteger)strongSelf.items.count) {
+        if (strongSelf.items.count < 2) {
             return MPRemoteCommandHandlerStatusNoSuchContent;
         }
         [strongSelf playNext];
@@ -2010,26 +2177,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     id previousToken = [center.previousTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
         OVPlayerViewController *strongSelf = weakSelf;
         if (!strongSelf) return MPRemoteCommandHandlerStatusCommandFailed;
-        if (strongSelf.currentIndex <= 0) {
-            return MPRemoteCommandHandlerStatusNoSuchContent;
-        }
         [strongSelf playPrevious];
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-
-    id skipForwardToken = [center.skipForwardCommand addTargetWithHandler:
-                           ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
-        OVPlayerViewController *strongSelf = weakSelf;
-        if (!strongSelf) return MPRemoteCommandHandlerStatusCommandFailed;
-        [strongSelf seekBySeconds:15.0];
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-
-    id skipBackwardToken = [center.skipBackwardCommand addTargetWithHandler:
-                            ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
-        OVPlayerViewController *strongSelf = weakSelf;
-        if (!strongSelf) return MPRemoteCommandHandlerStatusCommandFailed;
-        [strongSelf seekBySeconds:-10.0];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
 
@@ -2052,8 +2200,6 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (toggleToken) [tokens addObject:toggleToken];
     if (nextToken) [tokens addObject:nextToken];
     if (previousToken) [tokens addObject:previousToken];
-    if (skipForwardToken) [tokens addObject:skipForwardToken];
-    if (skipBackwardToken) [tokens addObject:skipBackwardToken];
     if (positionToken) [tokens addObject:positionToken];
     self.remoteCommandTokens = tokens;
 }
@@ -2069,8 +2215,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
     NSArray *commands = @[center.playCommand, center.pauseCommand,
                           center.togglePlayPauseCommand, center.nextTrackCommand,
-                          center.previousTrackCommand, center.skipForwardCommand,
-                          center.skipBackwardCommand,
+                          center.previousTrackCommand,
                           center.changePlaybackPositionCommand];
     for (id token in tokens) {
         for (MPRemoteCommand *command in commands) {
