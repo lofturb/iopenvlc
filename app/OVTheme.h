@@ -5,7 +5,22 @@ typedef NS_ENUM(NSInteger, OVTabIcon) {
     OVTabIconMusic,
     OVTabIconFolders,
     OVTabIconNetwork,
-    OVTabIconSettings
+    OVTabIconSettings,
+    OVTabIconPlaylists,
+    OVTabIconMore,
+    OVTabIconHistory
+};
+
+typedef NS_ENUM(NSInteger, OVBarIcon) {
+    OVBarIconSearch = 0,
+    OVBarIconSort,
+    OVBarIconMore,
+    OVBarIconAdd,
+    OVBarIconGrid,
+    OVBarIconList,
+    OVBarIconPlay,
+    OVBarIconSettings,
+    OVBarIconInfo
 };
 
 @interface OVTheme : NSObject
@@ -13,6 +28,7 @@ typedef NS_ENUM(NSInteger, OVTabIcon) {
 + (UIColor *)background;
 + (UIColor *)surface;
 + (UIColor *)surfaceLight;
++ (UIColor *)navBackground;
 + (UIColor *)text;
 + (UIColor *)secondaryText;
 + (UIColor *)separator;
@@ -24,6 +40,9 @@ typedef NS_ENUM(NSInteger, OVTabIcon) {
 + (NSString *)formatBytes:(unsigned long long)bytes;
 
 + (UIImage *)tabIcon:(OVTabIcon)icon;
++ (UIImage *)barIcon:(OVBarIcon)icon;
++ (UIImage *)vlcCone:(CGFloat)size;
++ (UIView *)brandTitleView;
 + (UIImage *)videoPlaceholder;
 + (UIImage *)musicPlaceholder;
 

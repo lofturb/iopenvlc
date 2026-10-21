@@ -4,6 +4,7 @@
 #import "OVMediaCell.h"
 #import "OVThumbnailCache.h"
 #import "OVPlayerViewController.h"
+#import "OVPlaylistStore.h"
 
 @interface OVLibraryViewController () <UICollectionViewDataSource, UICollectionViewDelegate,
                                        UICollectionViewDelegateFlowLayout, UISearchBarDelegate>
@@ -13,7 +14,9 @@
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) UISearchBar *searchBar;
 @property (nonatomic, strong) UIView *headerView;
+@property (nonatomic, strong) UILabel *sectionTitleLabel;
 @property (nonatomic, strong) UILabel *countLabel;
+@property (nonatomic, assign) BOOL searchVisible;
 @property (nonatomic, strong) UIButton *playAllButton;
 @property (nonatomic, strong) UIButton *shuffleButton;
 @property (nonatomic, strong) UIView *emptyView;
@@ -42,16 +45,27 @@
 {
     [super viewDidLoad];
     self.view.backgroundColor = [OVTheme background];
-    self.title = (self.mediaType == OVMediaTypeAudio) ? @"Música" : @"Vídeos";
-    self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithTitle:@"Ordenar"
+    self.title = (self.mediaType == OVMediaTypeAudio) ? @"Audio" : @"Vídeo";
+    self.navigationItem.titleView = [OVTheme brandTitleView];
+
+    UIBarButtonItem *searchItem =
+        [[UIBarButtonItem alloc] initWithImage:[OVTheme barIcon:OVBarIconSearch]
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(toggleSearch)];
+    searchItem.accessibilityLabel = @"Buscar";
+    UIBarButtonItem *sortItem =
+        [[UIBarButtonItem alloc] initWithImage:[OVTheme barIcon:OVBarIconSort]
                                          style:UIBarButtonItemStylePlain
                                         target:self
                                         action:@selector(showSortMenu)];
+    sortItem.accessibilityLabel = @"Ordenar";
+    self.navigationItem.rightBarButtonItems = @[sortItem, searchItem];
 
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectZero];
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"Buscar por título o carpeta";
+    self.searchBar.hidden = YES;
     self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
     self.searchBar.barStyle = UIBarStyleBlack;
     self.searchBar.tintColor = [OVTheme orange];
@@ -64,13 +78,19 @@
     self.headerView.backgroundColor = [OVTheme background];
     [self.view addSubview:self.headerView];
 
+    self.sectionTitleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    self.sectionTitleLabel.text = self.title;
+    self.sectionTitleLabel.textColor = [OVTheme text];
+    self.sectionTitleLabel.font = [OVTheme font:22.0 weight:UIFontWeightSemibold];
+    [self.headerView addSubview:self.sectionTitleLabel];
+
     self.countLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.countLabel.textColor = [OVTheme secondaryText];
-    self.countLabel.font = [OVTheme font:13.0 weight:UIFontWeightMedium];
+    self.countLabel.font = [OVTheme font:12.0 weight:UIFontWeightMedium];
     [self.headerView addSubview:self.countLabel];
 
     self.playAllButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.playAllButton setTitle:@"Reproducir todo" forState:UIControlStateNormal];
+    [self.playAllButton setTitle:@"Reproducir" forState:UIControlStateNormal];
     [self.playAllButton setTitleColor:[OVTheme orange] forState:UIControlStateNormal];
     self.playAllButton.titleLabel.font = [OVTheme font:13.0 weight:UIFontWeightSemibold];
     [self.playAllButton addTarget:self action:@selector(playAll) forControlEvents:UIControlEventTouchUpInside];
@@ -182,18 +202,18 @@
     CGFloat width = self.view.bounds.size.width;
     CGFloat height = self.view.bounds.size.height;
 
-    self.searchBar.frame = CGRectMake(6, 4, width - 12, 42);
-    self.headerView.frame = CGRectMake(0, 46, width, 44);
+    self.searchBar.frame = CGRectMake(6, 2, width - 12, 42);
+    CGFloat headerY = self.searchVisible ? 46.0 : 2.0;
+    self.headerView.frame = CGRectMake(0, headerY, width, 64.0);
 
-    CGFloat buttonWidth = 108.0;
-    if (width < 430) {
-        buttonWidth = 96.0;
-    }
-    self.playAllButton.frame = CGRectMake(width - buttonWidth * 2 - 10, 9, buttonWidth, 26);
-    self.shuffleButton.frame = CGRectMake(width - buttonWidth - 10, 9, buttonWidth, 26);
-    self.countLabel.frame = CGRectMake(18, 11, width - buttonWidth * 2 - 44, 22);
+    CGFloat buttonWidth = 96.0;
+    self.playAllButton.frame = CGRectMake(width - buttonWidth * 2 - 10, 14, buttonWidth, 34);
+    self.shuffleButton.frame = CGRectMake(width - buttonWidth - 10, 14, buttonWidth, 34);
+    self.sectionTitleLabel.frame = CGRectMake(18, 7, width - buttonWidth * 2 - 40, 28);
+    self.countLabel.frame = CGRectMake(18, 36, width - buttonWidth * 2 - 40, 18);
 
-    self.collectionView.frame = CGRectMake(0, 90, width, height - 90);
+    CGFloat top = headerY + 64.0;
+    self.collectionView.frame = CGRectMake(0, top, width, height - top);
     self.emptyView.frame = self.collectionView.frame;
 
     CGFloat iconSize = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) ? 74.0 : 56.0;
@@ -382,6 +402,11 @@
                                            handler:^(UIAlertAction *action) {
         [self playItemAtIndex:indexPath.item];
     }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Añadir a lista…"
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *action) {
+        [self addItemToPlaylist:item];
+    }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"Información"
                                              style:UIAlertActionStyleDefault
                                            handler:^(UIAlertAction *action) {
@@ -391,6 +416,64 @@
                                              style:UIAlertActionStyleCancel
                                            handler:nil]];
     [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)addItemToPlaylist:(OVMediaItem *)item
+{
+    OVPlaylistStore *store = [OVPlaylistStore sharedStore];
+    if (store.count == 0) {
+        [self createPlaylistAndAddItem:item];
+        return;
+    }
+
+    UIAlertController *sheet = [OVTheme actionSheetWithTitle:@"Añadir a lista"
+                                                      inView:self.view
+                                                     popover:self.collectionView];
+    __weak OVLibraryViewController *weakSelf = self;
+    for (NSInteger i = 0; i < store.count; i++) {
+        NSString *name = [store nameForPlaylistAtIndex:i];
+        [sheet addAction:[UIAlertAction actionWithTitle:name
+                                                 style:UIAlertActionStyleDefault
+                                               handler:^(UIAlertAction *action) {
+            [store addItem:item toPlaylistAtIndex:i];
+            [OVTheme showToast:[NSString stringWithFormat:@"Añadido a «%@»", name]
+                        inView:weakSelf.view];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Nueva lista…"
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *action) {
+        [weakSelf createPlaylistAndAddItem:item];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancelar"
+                                             style:UIAlertActionStyleCancel
+                                           handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)createPlaylistAndAddItem:(OVMediaItem *)item
+{
+    UIAlertController *alert =
+        [UIAlertController alertControllerWithTitle:@"Nueva lista"
+                                            message:@"Ponle un nombre a la lista."
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = @"Nombre de la lista";
+        textField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancelar"
+                                             style:UIAlertActionStyleCancel
+                                           handler:nil]];
+    __weak OVLibraryViewController *weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"Crear"
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *action) {
+        OVPlaylistStore *store = [OVPlaylistStore sharedStore];
+        NSInteger index = [store createPlaylistWithName:alert.textFields.firstObject.text];
+        [store addItem:item toPlaylistAtIndex:index];
+        [OVTheme showToast:@"Añadido a la nueva lista" inView:weakSelf.view];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showInfoForItem:(OVMediaItem *)item
@@ -412,6 +495,22 @@
                                               style:UIAlertActionStyleDefault
                                             handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+#pragma mark - Búsqueda
+
+- (void)toggleSearch
+{
+    self.searchVisible = !self.searchVisible;
+    self.searchBar.hidden = !self.searchVisible;
+    [self.view setNeedsLayout];
+    if (self.searchVisible) {
+        [self.searchBar becomeFirstResponder];
+    } else {
+        self.searchBar.text = @"";
+        [self.searchBar resignFirstResponder];
+        [self reloadItems];
+    }
 }
 
 #pragma mark - UISearchBarDelegate

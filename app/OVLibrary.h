@@ -3,6 +3,7 @@
 
 extern NSString *const OVLibraryDidChangeNotification;
 extern NSString *const OVLibraryScanProgressNotification;
+extern NSString *const OVHistoryDidChangeNotification;
 
 typedef NS_ENUM(NSInteger, OVSortMode) {
     OVSortModeName = 0,
@@ -39,6 +40,11 @@ typedef NS_ENUM(NSInteger, OVSortMode) {
 - (void)clearPositionForPath:(NSString *)path;
 
 - (NSString *)subtitlePathForMediaPath:(NSString *)path;
+
+- (void)recordHistoryForItem:(OVMediaItem *)item;
+- (NSArray *)historyItems;
+- (void)removeHistoryItemWithPath:(NSString *)path;
+- (void)clearHistory;
 
 + (BOOL)backgroundAudio;
 + (void)setBackgroundAudio:(BOOL)value;

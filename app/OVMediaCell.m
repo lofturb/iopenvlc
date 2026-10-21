@@ -17,7 +17,9 @@
         self.contentView.backgroundColor = [OVTheme surface];
         self.contentView.clipsToBounds = YES;
         self.clipsToBounds = YES;
-        self.layer.cornerRadius = 12.0;
+        self.layer.cornerRadius = 4.0;
+        self.layer.borderColor = [OVTheme separator].CGColor;
+        self.layer.borderWidth = 0.5;
 
         _thumbnailView = [[UIImageView alloc] initWithFrame:CGRectZero];
         _thumbnailView.contentMode = UIViewContentModeScaleAspectFill;
@@ -27,7 +29,7 @@
 
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
         _titleLabel.textColor = [OVTheme text];
-        _titleLabel.font = [OVTheme font:14.0 weight:UIFontWeightSemibold];
+        _titleLabel.font = [OVTheme font:14.0 weight:UIFontWeightMedium];
         _titleLabel.numberOfLines = 1;
         _titleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
         [self.contentView addSubview:_titleLabel];

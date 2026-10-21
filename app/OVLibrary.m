@@ -5,6 +5,7 @@
 
 NSString *const OVLibraryDidChangeNotification = @"OVLibraryDidChangeNotification";
 NSString *const OVLibraryScanProgressNotification = @"OVLibraryScanProgressNotification";
+NSString *const OVHistoryDidChangeNotification = @"OVHistoryDidChangeNotification";
 
 static NSString *const OVSourcesKey = @"OVSources";
 static NSString *const OVPositionsKey = @"OVPositions";
@@ -15,6 +16,7 @@ static NSString *const OVHardwareAccelerationKey = @"OVHardwareAcceleration";
 static NSString *const OVDeinterlaceKey = @"OVDeinterlace";
 static NSString *const OVSubtitleEncodingKey = @"OVSubtitleEncoding";
 static NSString *const OVNetworkCachingKey = @"OVNetworkCaching";
+static NSString *const OVHistoryKey = @"OVHistory";
 
 @interface OVLibrary ()
 @property (nonatomic, readwrite) NSArray *sources;
@@ -40,7 +42,7 @@ static NSString *const OVNetworkCachingKey = @"OVNetworkCaching";
         OVHardwareAccelerationKey: @YES,
         OVDeinterlaceKey: @NO,
         OVSubtitleEncodingKey: @"UTF-8",
-        OVNetworkCachingKey: @1500,
+        OVNetworkCachingKey: @1000,
         OVSortModeKey: @(OVSortModeName)
     }];
 }
@@ -527,6 +529,124 @@ static NSString *const OVNetworkCachingKey = @"OVNetworkCaching";
         return nil;
     }
     return [directory stringByAppendingPathComponent:candidates[0]];
+}
+
+#pragma mark - Historial
+
+- (NSString *)historyKeyForItem:(OVMediaItem *)item
+{
+    if (item.isNetwork) {
+        return item.url.absoluteString ?: item.path;
+    }
+    return item.path;
+}
+
+- (void)recordHistoryForItem:(OVMediaItem *)item
+{
+    NSString *key = [self historyKeyForItem:item];
+    if (key.length == 0) {
+        return;
+    }
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableArray *history = [[defaults arrayForKey:OVHistoryKey] mutableCopy];
+    if (!history) {
+        history = [NSMutableArray array];
+    }
+
+    NSMutableArray *clean = [NSMutableArray array];
+    for (id entry in history) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *path = entry[@"path"];
+        if (![path isEqualToString:key]) {
+            [clean addObject:entry];
+        }
+    }
+
+    NSDictionary *record = @{
+        @"path": key,
+        @"title": item.title ?: @"",
+        @"type": @(item.type),
+        @"network": @(item.isNetwork),
+        @"url": item.url.absoluteString ?: @"",
+        @"folder": item.folder ?: @"",
+        @"duration": @(item.duration),
+        @"lastPlayed": @([[NSDate date] timeIntervalSince1970])
+    };
+    [clean insertObject:record atIndex:0];
+    while (clean.count > 100) {
+        [clean removeLastObject];
+    }
+    [defaults setObject:clean forKey:OVHistoryKey];
+    [defaults synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:OVHistoryDidChangeNotification
+                                                        object:self];
+}
+
+- (NSArray *)historyItems
+{
+    NSArray *history = [[NSUserDefaults standardUserDefaults] arrayForKey:OVHistoryKey];
+    NSMutableArray *items = [NSMutableArray array];
+    for (NSDictionary *record in history) {
+        if (![record isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *path = record[@"path"];
+        BOOL network = [record[@"network"] boolValue];
+        NSString *title = record[@"title"];
+        OVMediaType type = (OVMediaType)[record[@"type"] integerValue];
+
+        OVMediaItem *item = nil;
+        if (network && path.length > 0) {
+            NSURL *url = [NSURL URLWithString:path];
+            if (url) {
+                item = [[OVMediaItem alloc] initWithNetworkURL:url title:title];
+            }
+        } else if (path.length > 0) {
+            item = [[OVMediaItem alloc] initWithPath:path type:type];
+            item.title = title.length > 0 ? title : item.title;
+            OVMediaItem *libraryItem = self.itemsByPath[path];
+            if (libraryItem) {
+                item.duration = libraryItem.duration;
+                item.size = libraryItem.size;
+                item.lastPosition = libraryItem.lastPosition;
+            }
+        }
+        if (item) {
+            [items addObject:item];
+        }
+    }
+    return items;
+}
+
+- (void)removeHistoryItemWithPath:(NSString *)path
+{
+    if (path.length == 0) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray *history = [defaults arrayForKey:OVHistoryKey];
+    NSMutableArray *clean = [NSMutableArray array];
+    for (NSDictionary *record in history) {
+        if ([record isKindOfClass:[NSDictionary class]] &&
+            ![record[@"path"] isEqualToString:path]) {
+            [clean addObject:record];
+        }
+    }
+    [defaults setObject:clean forKey:OVHistoryKey];
+    [defaults synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:OVHistoryDidChangeNotification
+                                                        object:self];
+}
+
+- (void)clearHistory
+{
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:OVHistoryKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:OVHistoryDidChangeNotification
+                                                        object:self];
 }
 
 #pragma mark - Ajustes

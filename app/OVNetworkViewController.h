@@ -2,4 +2,6 @@
 
 @interface OVNetworkViewController : UIViewController
 
+- (void)promptForURL;
+
 @end

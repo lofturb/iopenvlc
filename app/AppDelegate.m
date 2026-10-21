@@ -1,8 +1,8 @@
 #import "AppDelegate.h"
 #import "OVLibraryViewController.h"
-#import "OVFolderBrowserViewController.h"
-#import "OVNetworkViewController.h"
-#import "OVSettingsViewController.h"
+#import "OVBrowseViewController.h"
+#import "OVPlaylistsViewController.h"
+#import "OVMoreViewController.h"
 #import "OVPlayerViewController.h"
 #import "OVMediaItem.h"
 #import "OVTheme.h"
@@ -25,23 +25,24 @@
         [[OVLibraryViewController alloc] initWithMediaType:OVMediaTypeVideo];
     OVLibraryViewController *music =
         [[OVLibraryViewController alloc] initWithMediaType:OVMediaTypeAudio];
-    OVFolderBrowserViewController *folders =
-        [[OVFolderBrowserViewController alloc] initWithPath:[self startingBrowserPath]];
-    OVNetworkViewController *network = [[OVNetworkViewController alloc] init];
-    OVSettingsViewController *settings = [[OVSettingsViewController alloc] init];
+    OVBrowseViewController *browse = [[OVBrowseViewController alloc] init];
+    OVPlaylistsViewController *playlists = [[OVPlaylistsViewController alloc] init];
+    OVMoreViewController *more = [[OVMoreViewController alloc] init];
 
     self.tabBarController = [[UITabBarController alloc] init];
     self.tabBarController.viewControllers = @[
-        [self navigationControllerWithRoot:videos title:@"Vídeos" icon:OVTabIconVideos tag:0],
-        [self navigationControllerWithRoot:music title:@"Música" icon:OVTabIconMusic tag:1],
-        [self navigationControllerWithRoot:folders title:@"Carpetas" icon:OVTabIconFolders tag:2],
-        [self navigationControllerWithRoot:network title:@"Red" icon:OVTabIconNetwork tag:3],
-        [self navigationControllerWithRoot:settings title:@"Ajustes" icon:OVTabIconSettings tag:4]
+        [self navigationControllerWithRoot:videos title:@"Vídeo" icon:OVTabIconVideos tag:0],
+        [self navigationControllerWithRoot:music title:@"Audio" icon:OVTabIconMusic tag:1],
+        [self navigationControllerWithRoot:browse title:@"Explorar" icon:OVTabIconFolders tag:2],
+        [self navigationControllerWithRoot:playlists title:@"Listas" icon:OVTabIconPlaylists tag:3],
+        [self navigationControllerWithRoot:more title:@"Más" icon:OVTabIconMore tag:4]
     ];
     self.tabBarController.selectedIndex = 0;
-    self.tabBarController.tabBar.barTintColor = [OVTheme surface];
+    self.tabBarController.tabBar.barTintColor = [OVTheme navBackground];
     self.tabBarController.tabBar.translucent = NO;
     self.tabBarController.tabBar.tintColor = [OVTheme orange];
+    self.tabBarController.tabBar.layer.borderColor = [OVTheme separator].CGColor;
+    self.tabBarController.tabBar.layer.borderWidth = 0.5;
 
     self.window.rootViewController = self.tabBarController;
     [self.window makeKeyAndVisible];
@@ -91,7 +92,7 @@
 {
     [[UINavigationBar appearance] setBarStyle:UIBarStyleBlack];
     [[UINavigationBar appearance] setTranslucent:NO];
-    [[UINavigationBar appearance] setBarTintColor:[OVTheme surface]];
+    [[UINavigationBar appearance] setBarTintColor:[OVTheme navBackground]];
     [[UINavigationBar appearance] setTintColor:[OVTheme orange]];
     [[UINavigationBar appearance] setTitleTextAttributes:@{
         NSForegroundColorAttributeName: [OVTheme text],

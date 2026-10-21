@@ -85,6 +85,8 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 @property (nonatomic, assign) CFTimeInterval lastNowPlayingUpdate;
 @property (nonatomic, assign) BOOL scrubbing;
 @property (nonatomic, assign) BOOL videoVisible;
+@property (nonatomic, copy) NSString *lastHistoryPath;
+@property (nonatomic, strong) NSTimer *sleepTimer;
 
 // Views
 @property (nonatomic, strong) UIView *videoView;
@@ -214,7 +216,7 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
     [self setupRemoteCommands];
     if (!self.started) {
         self.started = YES;
-        [self showSpinnerWithText:@"Abriendo…"];
+        [self showSpinnerWithText:@"Cargando…"];
         [self.listPlayer playItemAtNumber:@(self.currentIndex)];
     }
 }
@@ -230,6 +232,8 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.sleepTimer invalidate];
+    self.sleepTimer = nil;
     [self teardownRemoteCommands];
     [self.listPlayer stop];
     self.listPlayer.mediaPlayer.delegate = nil;
@@ -540,10 +544,19 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 
         [media addOption:@"--no-video-title-show"];
 
-        NSInteger caching = [OVLibrary networkCaching];
-        if (caching > 0) {
-            [media addOption:[NSString stringWithFormat:@"--network-caching=%ld",
-                              (long)caching]];
+        if (item.isNetwork) {
+            NSInteger caching = [OVLibrary networkCaching];
+            if (caching > 0) {
+                [media addOption:[NSString stringWithFormat:@"--network-caching=%ld",
+                                  (long)caching]];
+                [media addOption:[NSString stringWithFormat:@"--live-caching=%ld",
+                                  (long)caching]];
+            }
+        } else {
+            // Los archivos locales no necesitan el búfer de red. Un caché pequeño
+            // acelera el arranque y evita pausas al buscar dentro del archivo.
+            [media addOption:@"--file-caching=300"];
+            [media addOption:@"--disc-caching=300"];
         }
         if (![OVLibrary hardwareAcceleration]) {
             [media addOption:@"--avcodec-hw=none"];
@@ -608,6 +621,12 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
     if (!item) {
         return;
     }
+    NSString *historyKey = item.isNetwork ? item.url.absoluteString : item.path;
+    if (historyKey.length > 0 && ![historyKey isEqualToString:self.lastHistoryPath]) {
+        self.lastHistoryPath = historyKey;
+        [[OVLibrary sharedLibrary] recordHistoryForItem:item];
+    }
+
     self.titleLabel.text = item.title;
     self.subtitleLabel.text = item.isNetwork
         ? (item.url.absoluteString ?: @"Red")
@@ -1069,9 +1088,15 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     BOOL buffering = (state == VLCMediaPlayerStateBuffering);
 
     if (opening) {
-        [self showSpinnerWithText:@"Abriendo…"];
+        [self showSpinnerWithText:@"Cargando…"];
     } else if (buffering) {
-        [self showSpinnerWithText:@"Almacenando en búfer…"];
+        // En archivos locales el estado de búfer dura milisegundos y no debe
+        // mostrar un aviso. Solo los streams de red necesitan precargar datos.
+        if ([self currentItem].isNetwork) {
+            [self showSpinnerWithText:@"Cargando…"];
+        } else {
+            [self hideSpinner];
+        }
     } else if (state == VLCMediaPlayerStateError) {
         [self hideSpinner];
         self.statusLabel.text = @"No se pudo reproducir este archivo.";
@@ -1307,6 +1332,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                                            handler:^(UIAlertAction *action) {
         [weakSelf showRepeatMenu];
     }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:(self.sleepTimer
+                                                      ? @"Temporizador de sueño (activo)"
+                                                      : @"Temporizador de sueño")
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *action) {
+        [weakSelf showSleepTimerMenu];
+    }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"Cargar subtítulo externo…"
                                              style:UIAlertActionStyleDefault
                                            handler:^(UIAlertAction *action) {
@@ -1339,6 +1371,57 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         sheet.popoverPresentationController.sourceRect = self.optionsButton.bounds;
     }
     [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)showSleepTimerMenu
+{
+    UIAlertController *sheet = [OVTheme actionSheetWithTitle:@"Temporizador de sueño"
+                                                      inView:self.view
+                                                     popover:self.optionsButton];
+    __weak OVPlayerViewController *weakSelf = self;
+    NSArray *minutes = @[@15, @30, @45, @60, @90];
+    for (NSNumber *value in minutes) {
+        NSString *title = [NSString stringWithFormat:@"%@ minutos", value];
+        [sheet addAction:[UIAlertAction actionWithTitle:title
+                                                 style:UIAlertActionStyleDefault
+                                               handler:^(UIAlertAction *action) {
+            [weakSelf startSleepTimerWithMinutes:value.integerValue];
+        }]];
+    }
+    if (self.sleepTimer) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Desactivar temporizador"
+                                                 style:UIAlertActionStyleDestructive
+                                               handler:^(UIAlertAction *action) {
+            [weakSelf.sleepTimer invalidate];
+            weakSelf.sleepTimer = nil;
+            [weakSelf showHUDWithText:@"Temporizador desactivado"];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancelar"
+                                             style:UIAlertActionStyleCancel
+                                           handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)startSleepTimerWithMinutes:(NSInteger)minutes
+{
+    [self.sleepTimer invalidate];
+    self.sleepTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)(minutes * 60)
+                                                      target:self
+                                                    selector:@selector(sleepTimerFired:)
+                                                    userInfo:nil
+                                                     repeats:NO];
+    [self showHUDWithText:[NSString stringWithFormat:@"Se pausará en %ld min",
+                           (long)minutes]];
+}
+
+- (void)sleepTimerFired:(NSTimer *)timer
+{
+    self.sleepTimer = nil;
+    [self saveCurrentPosition];
+    [self.listPlayer pause];
+    [self showHUDWithText:@"Reproducción pausada"];
+    [self showControls];
 }
 
 #pragma mark - Menu: tracks and subtitles

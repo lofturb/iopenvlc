@@ -11,12 +11,15 @@
                            alpha:alpha];
 }
 
-+ (UIColor *)background { return [self colorWithHex:0x0E0E10 alpha:1.0]; }
-+ (UIColor *)surface { return [self colorWithHex:0x1A1A1D alpha:1.0]; }
-+ (UIColor *)surfaceLight { return [self colorWithHex:0x252529 alpha:1.0]; }
-+ (UIColor *)text { return [UIColor whiteColor]; }
-+ (UIColor *)secondaryText { return [self colorWithHex:0xA2A2A8 alpha:1.0]; }
-+ (UIColor *)separator { return [self colorWithHex:0x303035 alpha:1.0]; }
+// Paleta de VLC para Android (tema oscuro): fondo #131313, barras #121212,
+// tarjetas #1E1E1E y naranja VLC #FF8800.
++ (UIColor *)background { return [self colorWithHex:0x131313 alpha:1.0]; }
++ (UIColor *)surface { return [self colorWithHex:0x1E1E1E alpha:1.0]; }
++ (UIColor *)surfaceLight { return [self colorWithHex:0x2A2A2A alpha:1.0]; }
++ (UIColor *)navBackground { return [self colorWithHex:0x121212 alpha:1.0]; }
++ (UIColor *)text { return [self colorWithHex:0xFAFAFA alpha:1.0]; }
++ (UIColor *)secondaryText { return [self colorWithHex:0x9E9E9E alpha:1.0]; }
++ (UIColor *)separator { return [self colorWithHex:0x2A2A2A alpha:1.0]; }
 + (UIColor *)orange { return [self colorWithHex:0xFF8800 alpha:1.0]; }
 + (UIColor *)red { return [self colorWithHex:0xFF453A alpha:1.0]; }
 
@@ -101,6 +104,29 @@
         CGContextMoveToPoint(ctx, 2.5, 12.5);
         CGContextAddLineToPoint(ctx, 22.5, 12.5);
         CGContextStrokePath(ctx);
+    } else if (icon == OVTabIconPlaylists) {
+        CGContextMoveToPoint(ctx, 3.0, 7.0);
+        CGContextAddLineToPoint(ctx, 14.0, 7.0);
+        CGContextMoveToPoint(ctx, 3.0, 12.5);
+        CGContextAddLineToPoint(ctx, 14.0, 12.5);
+        CGContextMoveToPoint(ctx, 3.0, 18.0);
+        CGContextAddLineToPoint(ctx, 14.0, 18.0);
+        CGContextStrokePath(ctx);
+        CGContextMoveToPoint(ctx, 15.5, 7.8);
+        CGContextAddLineToPoint(ctx, 15.5, 17.2);
+        CGContextAddLineToPoint(ctx, 22.0, 12.5);
+        CGContextClosePath(ctx);
+        CGContextFillPath(ctx);
+    } else if (icon == OVTabIconMore) {
+        CGContextFillEllipseInRect(ctx, CGRectMake(3.2, 10.6, 4.0, 4.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(10.5, 10.6, 4.0, 4.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(17.8, 10.6, 4.0, 4.0));
+    } else if (icon == OVTabIconHistory) {
+        CGContextStrokeEllipseInRect(ctx, CGRectMake(3.0, 3.0, 19.0, 19.0));
+        CGContextMoveToPoint(ctx, 12.5, 7.0);
+        CGContextAddLineToPoint(ctx, 12.5, 13.0);
+        CGContextAddLineToPoint(ctx, 17.0, 15.5);
+        CGContextStrokePath(ctx);
     } else {
         CGContextMoveToPoint(ctx, 3.0, 7.0);
         CGContextAddLineToPoint(ctx, 22.0, 7.0);
@@ -117,6 +143,139 @@
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     return [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
++ (UIImage *)barIcon:(OVBarIcon)icon
+{
+    CGSize size = CGSizeMake(24.0, 24.0);
+    UIGraphicsBeginImageContextWithOptions(size, NO, 0.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    UIColor *black = [UIColor blackColor];
+    CGContextSetFillColorWithColor(ctx, black.CGColor);
+    CGContextSetStrokeColorWithColor(ctx, black.CGColor);
+    CGContextSetLineWidth(ctx, 1.9);
+    CGContextSetLineCap(ctx, kCGLineCapRound);
+    CGContextSetLineJoin(ctx, kCGLineJoinRound);
+
+    if (icon == OVBarIconSearch) {
+        CGContextStrokeEllipseInRect(ctx, CGRectMake(3.0, 3.0, 13.0, 13.0));
+        CGContextMoveToPoint(ctx, 15.0, 15.0);
+        CGContextAddLineToPoint(ctx, 21.0, 21.0);
+        CGContextStrokePath(ctx);
+    } else if (icon == OVBarIconSort) {
+        CGContextMoveToPoint(ctx, 3.0, 6.0);
+        CGContextAddLineToPoint(ctx, 18.0, 6.0);
+        CGContextMoveToPoint(ctx, 3.0, 12.0);
+        CGContextAddLineToPoint(ctx, 14.0, 12.0);
+        CGContextMoveToPoint(ctx, 3.0, 18.0);
+        CGContextAddLineToPoint(ctx, 10.0, 18.0);
+        CGContextStrokePath(ctx);
+        CGContextMoveToPoint(ctx, 18.0, 15.0);
+        CGContextAddLineToPoint(ctx, 21.0, 18.0);
+        CGContextAddLineToPoint(ctx, 18.0, 21.0);
+        CGContextStrokePath(ctx);
+    } else if (icon == OVBarIconMore) {
+        CGContextFillEllipseInRect(ctx, CGRectMake(10.2, 3.4, 3.6, 3.6));
+        CGContextFillEllipseInRect(ctx, CGRectMake(10.2, 10.2, 3.6, 3.6));
+        CGContextFillEllipseInRect(ctx, CGRectMake(10.2, 17.0, 3.6, 3.6));
+    } else if (icon == OVBarIconAdd) {
+        CGContextMoveToPoint(ctx, 12.0, 4.0);
+        CGContextAddLineToPoint(ctx, 12.0, 20.0);
+        CGContextMoveToPoint(ctx, 4.0, 12.0);
+        CGContextAddLineToPoint(ctx, 20.0, 12.0);
+        CGContextStrokePath(ctx);
+    } else if (icon == OVBarIconGrid) {
+        UIBezierPath *a = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(3.0, 3.0, 8.0, 8.0) cornerRadius:1.5];
+        UIBezierPath *b = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(13.0, 3.0, 8.0, 8.0) cornerRadius:1.5];
+        UIBezierPath *c = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(3.0, 13.0, 8.0, 8.0) cornerRadius:1.5];
+        UIBezierPath *d = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(13.0, 13.0, 8.0, 8.0) cornerRadius:1.5];
+        [a fill]; [b fill]; [c fill]; [d fill];
+    } else if (icon == OVBarIconList) {
+        CGContextMoveToPoint(ctx, 7.0, 6.0);
+        CGContextAddLineToPoint(ctx, 21.0, 6.0);
+        CGContextMoveToPoint(ctx, 7.0, 12.0);
+        CGContextAddLineToPoint(ctx, 21.0, 12.0);
+        CGContextMoveToPoint(ctx, 7.0, 18.0);
+        CGContextAddLineToPoint(ctx, 21.0, 18.0);
+        CGContextStrokePath(ctx);
+        CGContextFillEllipseInRect(ctx, CGRectMake(2.5, 4.5, 3.0, 3.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(2.5, 10.5, 3.0, 3.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(2.5, 16.5, 3.0, 3.0));
+    } else if (icon == OVBarIconPlay) {
+        CGContextMoveToPoint(ctx, 7.0, 4.5);
+        CGContextAddLineToPoint(ctx, 7.0, 19.5);
+        CGContextAddLineToPoint(ctx, 20.0, 12.0);
+        CGContextClosePath(ctx);
+        CGContextFillPath(ctx);
+    } else if (icon == OVBarIconSettings) {
+        CGContextMoveToPoint(ctx, 3.0, 7.0);
+        CGContextAddLineToPoint(ctx, 21.0, 7.0);
+        CGContextMoveToPoint(ctx, 3.0, 17.0);
+        CGContextAddLineToPoint(ctx, 21.0, 17.0);
+        CGContextStrokePath(ctx);
+        CGContextFillEllipseInRect(ctx, CGRectMake(6.0, 4.5, 5.0, 5.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(13.0, 14.5, 5.0, 5.0));
+    } else {
+        CGContextStrokeEllipseInRect(ctx, CGRectMake(3.0, 3.0, 18.0, 18.0));
+        CGContextFillEllipseInRect(ctx, CGRectMake(10.6, 9.5, 2.8, 2.8));
+        CGContextFillRect(ctx, CGRectMake(10.6, 13.5, 2.8, 6.0));
+    }
+
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
++ (UIImage *)vlcCone:(CGFloat)size
+{
+    if (size <= 0.0) {
+        return nil;
+    }
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(size, size), NO, 0.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+
+    UIBezierPath *cone = [UIBezierPath bezierPath];
+    [cone moveToPoint:CGPointMake(size * 0.50, size * 0.06)];
+    [cone addLineToPoint:CGPointMake(size * 0.63, size * 0.34)];
+    [cone addLineToPoint:CGPointMake(size * 0.84, size * 0.80)];
+    [cone addQuadCurveToPoint:CGPointMake(size * 0.77, size * 0.91)
+                controlPoint:CGPointMake(size * 0.84, size * 0.90)];
+    [cone addLineToPoint:CGPointMake(size * 0.23, size * 0.91)];
+    [cone addQuadCurveToPoint:CGPointMake(size * 0.16, size * 0.80)
+                controlPoint:CGPointMake(size * 0.16, size * 0.90)];
+    [cone addLineToPoint:CGPointMake(size * 0.37, size * 0.34)];
+    [cone closePath];
+    [[self orange] setFill];
+    [cone fill];
+
+    CGContextSaveGState(ctx);
+    [cone addClip];
+    [[self colorWithHex:0xFFF3E0 alpha:0.92] setFill];
+    CGContextFillRect(ctx, CGRectMake(0.0, size * 0.40, size, size * 0.10));
+    CGContextFillRect(ctx, CGRectMake(0.0, size * 0.58, size, size * 0.08));
+    CGContextRestoreGState(ctx);
+
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
+
++ (UIView *)brandTitleView
+{
+    UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, 108.0, 34.0)];
+    view.backgroundColor = [UIColor clearColor];
+
+    UIImageView *logo = [[UIImageView alloc] initWithFrame:CGRectMake(0.0, 4.0, 26.0, 26.0)];
+    logo.image = [self vlcCone:26.0];
+    logo.contentMode = UIViewContentModeScaleAspectFit;
+    [view addSubview:logo];
+
+    UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(32.0, 0.0, 72.0, 34.0)];
+    label.text = @"VLC";
+    label.textColor = [self orange];
+    label.font = [self font:20.0 weight:UIFontWeightBold];
+    [view addSubview:label];
+    return view;
 }
 
 + (UIImage *)placeholderWithSymbol:(NSString *)symbol
@@ -165,7 +324,7 @@
 {
     bar.barStyle = UIBarStyleBlack;
     bar.translucent = NO;
-    bar.barTintColor = [self surface];
+    bar.barTintColor = [self navBackground];
     bar.tintColor = [self orange];
     bar.titleTextAttributes = @{
         NSForegroundColorAttributeName: [self text],

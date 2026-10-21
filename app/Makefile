@@ -31,6 +31,12 @@ VLC9_FILES = \
 	OVFolderBrowserViewController.m \
 	OVPlayerViewController.m \
 	OVPlaylistViewController.m \
+	OVPlaylistStore.m \
+	OVPlaylistsViewController.m \
+	OVPlaylistDetailViewController.m \
+	OVBrowseViewController.m \
+	OVMoreViewController.m \
+	OVHistoryViewController.m \
 	OVNetworkViewController.m \
 	OVSettingsViewController.m
 
