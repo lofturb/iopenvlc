@@ -229,6 +229,7 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
     [self restoreVolume];
     [self setupRemoteCommands];
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+    [self updateNowPlayingInfo];
     if (!self.started) {
         self.started = YES;
         [self showSpinnerWithText:@"Cargando…"];
@@ -2081,6 +2082,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(MAX(0.0, elapsed));
     info[MPNowPlayingInfoPropertyPlaybackRate] = @(player.isPlaying ? 1.0 : 0.0);
     info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = @1.0;
+    info[MPNowPlayingInfoPropertyPlaybackQueueIndex] = @(self.currentIndex);
+    info[MPNowPlayingInfoPropertyPlaybackQueueCount] = @(self.items.count);
     info[MPMediaItemPropertyMediaType] = @(item.type == OVMediaTypeAudio
                                            ? MPMediaTypeMusic : MPMediaTypeMovie);
 
