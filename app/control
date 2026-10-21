@@ -1,0 +1,10 @@
+Package: com.lofturb.vlc9
+Name: VLC 9
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Reproductor multimedia completo para iOS 9 con el motor de VLC, navegador de carpetas, listas y red.
+Homepage: https://github.com/lofturb/iopenvlc
+Maintainer: lofturb
+Author: lofturb
+Section: Multimedia
+Depends: firmware (>= 9.0)

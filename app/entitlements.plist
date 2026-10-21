@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Identidad. Debe coincidir con CFBundleIdentifier. -->
+	<key>application-identifier</key>
+	<string>com.lofturb.vlc9</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>com.lofturb</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>com.lofturb.vlc9</string>
+	</array>
+
+	<!-- App de jailbreak: sin sandbox y con acceso a las carpetas del iPad. -->
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.security.exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/var/mobile/Media/</string>
+		<string>/private/var/mobile/Media/</string>
+		<string>/var/mobile/Documents/</string>
+		<string>/private/var/mobile/Documents/</string>
+		<string>/var/mobile/</string>
+	</array>
+	<key>com.apple.security.exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/</string>
+	</array>
+	<key>get-task-allow</key>
+	<true/>
+</dict>
+</plist>

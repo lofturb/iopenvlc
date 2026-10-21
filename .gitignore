@@ -1,0 +1,14 @@
+# Artefactos de compilacion
+.theos/
+packages/
+*.ipa
+*.deb
+*.dylib
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+Thumbs.db
