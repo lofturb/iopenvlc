@@ -118,7 +118,7 @@ static UIImage *OVPlayerGlyph(OVPlayerGlyphType type, CGFloat size)
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UILabel *hudLabel;
-@property (nonatomic, strong) NSUInteger hudGeneration;
+@property (nonatomic, assign) NSUInteger hudGeneration;
 
 // State
 @property (nonatomic, assign) BOOL controlsVisible;
