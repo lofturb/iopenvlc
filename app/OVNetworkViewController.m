@@ -630,8 +630,8 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
     }
     self.parsing = YES;
     [self startLoading];
-    int result = [self.media parseWithOptions:(VLCMediaParsingOptionsParseNetwork |
-                                              VLCMediaParsingOptionsFetchNetwork)
+    int result = [self.media parseWithOptions:(VLCMediaParseNetwork |
+                                              VLCMediaFetchNetwork)
                                       timeout:12000];
     if (result != 0) {
         self.parsing = NO;

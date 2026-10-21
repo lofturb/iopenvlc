@@ -1566,7 +1566,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     UIAlertController *sheet = [OVTheme actionSheetWithTitle:@"Repetir"
                                                       inView:self.view
                                                      popover:self.repeatButton];
-    NSArray *titles = @[@"No repetir", @"Repetir todo", @"Repetir uno"];
+    NSArray *titles = @[@"No repetir", @"Repetir uno", @"Repetir todo"];
     VLCRepeatMode current = self.listPlayer.repeatMode;
     __weak OVPlayerViewController *weakSelf = self;
     for (NSInteger i = 0; i < titles.count; i++) {
