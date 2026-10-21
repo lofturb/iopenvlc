@@ -220,7 +220,6 @@ typedef NS_ENUM(NSInteger, OVSettingsSection) {
                 cell.imageView.tintColor = [OVTheme orange];
             }
             NSDictionary *sourceInfo = sources[indexPath.row];
-            NSString *path = sourceInfo[@"path"];
             cell.textLabel.text = [[OVLibrary sharedLibrary] displayNameForSource:sourceInfo];
             NSInteger count = [[OVLibrary sharedLibrary] countForSource:sourceInfo];
             NSString *recursive = [sourceInfo[@"recursive"] boolValue]

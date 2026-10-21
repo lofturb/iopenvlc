@@ -66,11 +66,15 @@ before-package::
 	@rm -rf "$(THEOS_STAGING_DIR)/Applications/VLC9.app/Frameworks/MobileVLCKit.framework"
 	@cp -R "vendor/MobileVLCKit.framework" "$(THEOS_STAGING_DIR)/Applications/VLC9.app/Frameworks/"
 	@chmod +x "$(THEOS_STAGING_DIR)/Applications/VLC9.app/Frameworks/MobileVLCKit.framework/MobileVLCKit"
-	@if [ -x "$(THEOS)/bin/ldid" ]; then \
-		"$(THEOS)/bin/ldid" -S "$(THEOS_STAGING_DIR)/Applications/VLC9.app/Frameworks/MobileVLCKit.framework/MobileVLCKit"; \
-	else \
-		echo "AVISO: ldid no encontrado; el framework quedara sin firma"; \
-	fi
+	@set -e; \
+	LDID=$$(command -v ldid 2>/dev/null || true); \
+	if [ -z "$$LDID" ] && [ -x "$(THEOS)/bin/ldid" ]; then LDID="$(THEOS)/bin/ldid"; fi; \
+	if [ -z "$$LDID" ]; then \
+		echo "ERROR: ldid no encontrado; no se puede firmar MobileVLCKit"; \
+		exit 1; \
+	fi; \
+	echo ">> Firmando MobileVLCKit con $$LDID"; \
+	"$$LDID" -S "$(THEOS_STAGING_DIR)/Applications/VLC9.app/Frameworks/MobileVLCKit.framework/MobileVLCKit"
 	@echo ">> Framework listo en VLC9.app/Frameworks"
 
 include $(THEOS_MAKE_PATH)/application.mk

@@ -61,6 +61,22 @@ jobs:
           fi
           "$THEOS/toolchain/linux/iphone/bin/clang" --version
 
+      # Theos no trae ldid en Linux y sin el la app y el framework quedan sin
+      # firma ad-hoc (AppSync la rechaza). Se instala en $THEOS/bin y en PATH.
+      - name: Instalar ldid (firma ad-hoc)
+        run: |
+          set -euo pipefail
+          mkdir -p "$THEOS/bin"
+          if [ ! -x "$THEOS/bin/ldid" ]; then
+            URL="https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64"
+            curl -fL --retry 3 --retry-delay 2 -o /tmp/ldid "$URL"
+            chmod +x /tmp/ldid
+            cp /tmp/ldid "$THEOS/bin/ldid"
+            sudo cp /tmp/ldid /usr/local/bin/ldid
+          fi
+          "$THEOS/bin/ldid" -h 2>&1 | head -n 3 || true
+          command -v ldid
+
       - name: Instalar SDK de iOS 9.3
         run: |
           set -euo pipefail
@@ -150,12 +166,15 @@ jobs:
           file "$APP/$APP_NAME"
           "$OTOOL" -L "$APP/$APP_NAME" | grep -q "@rpath/MobileVLCKit.framework/MobileVLCKit" \
             || { echo "La app no enlaza MobileVLCKit por @rpath"; exit 1; }
+          "$OTOOL" -l "$APP/$APP_NAME" | grep -q LC_CODE_SIGNATURE \
+            || { echo "La app no tiene firma ad-hoc"; exit 1; }
 
       - name: Comprobar los entitlements
         run: |
           set -euo pipefail
           BIN=$(find "$GITHUB_WORKSPACE/$APP_DIR/.theos" -type f -name "$APP_NAME" | head -n 1)
-          LDID=$(find "$THEOS" -type f -name 'ldid' | head -n 1)
+          LDID=$(command -v ldid || true)
+          if [ -z "$LDID" ] && [ -x "$THEOS/bin/ldid" ]; then LDID="$THEOS/bin/ldid"; fi
           echo "ldid: $LDID"
           if [ -n "$LDID" ]; then
             "$LDID" -e "$BIN" || echo "(no se pudieron leer los entitlements)"
