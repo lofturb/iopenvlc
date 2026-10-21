@@ -20,7 +20,7 @@
 + (UIColor *)orange { return [self colorWithHex:0xFF8800 alpha:1.0]; }
 + (UIColor *)red { return [self colorWithHex:0xFF453A alpha:1.0]; }
 
-+ (UIFont *)font:(CGFloat)size weight:(UIFontWeight)weight
++ (UIFont *)font:(CGFloat)size weight:(CGFloat)weight
 {
     return [UIFont systemFontOfSize:size weight:weight];
 }
@@ -171,8 +171,8 @@
         NSForegroundColorAttributeName: [self text],
         NSFontAttributeName: [self font:17.0 weight:UIFontWeightSemibold]
     };
-    if ([bar respondsToSelector:@selector(setShadowImage:forToolbarPosition:)]) {
-        [bar setShadowImage:[[UIImage alloc] init] forToolbarPosition:UIBarPositionAny];
+    if ([bar respondsToSelector:@selector(setShadowImage:)]) {
+        bar.shadowImage = [[UIImage alloc] init];
     }
 }
 

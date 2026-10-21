@@ -19,7 +19,7 @@ typedef NS_ENUM(NSInteger, OVTabIcon) {
 + (UIColor *)orange;
 + (UIColor *)red;
 
-+ (UIFont *)font:(CGFloat)size weight:(UIFontWeight)weight;
++ (UIFont *)font:(CGFloat)size weight:(CGFloat)weight;
 + (NSString *)formatTime:(double)seconds;
 + (NSString *)formatBytes:(unsigned long long)bytes;
 
